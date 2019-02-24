@@ -74,6 +74,7 @@ bool swdptap_bit_in(void)
 
 	DELAY();
 	ret = gpio_get(SWDIO_PORT, SWDIO_PIN);
+	DELAY();
 	gpio_set(SWCLK_PORT, SWCLK_PIN);
 	gpio_set(SWCLK_PORT, SWCLK_PIN);
 	DELAY();
