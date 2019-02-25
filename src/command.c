@@ -254,7 +254,7 @@ static bool cmd_connect_srst(target *t, int argc, const char **argv)
 		gdb_outf("Assert SRST during connect: %s\n",
 			 connect_assert_srst ? "enabled" : "disabled");
 	else
-		connect_assert_srst = !strcmp(argv[1], "enable");
+		connect_assert_srst = !strncmp(argv[1], "enable", strlen(argv[1]));
 	return true;
 }
 
@@ -314,7 +314,7 @@ static bool cmd_debug_bmp(target *t, int argc, const char **argv)
 {
 	(void)t;
 	if (argc > 1) {
-		debug_bmp = !strcmp(argv[1], "enable");
+		debug_bmp = !strncmp(argv[1], "enable", strlen(argv[1]));
 	}
 	gdb_outf("Debug mode is %s\n",
 		 debug_bmp ? "enabled" : "disabled");
