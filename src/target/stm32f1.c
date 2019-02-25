@@ -118,6 +118,7 @@ bool stm32f1_probe(target *t)
 	size_t flash_size;
 	size_t block_size = 0x400;
 	t->idcode = target_mem_read32(t, DBGMCU_IDCODE) & 0xfff;
+	DEBUG("stage 1 got id code %" PRIx32 "\n", t->idcode);
 	switch(t->idcode) {
 	case 0x410:  /* Medium density */
 	case 0x412:  /* Low denisty */
@@ -150,6 +151,7 @@ bool stm32f1_probe(target *t)
 	}
 
 	t->idcode = target_mem_read32(t, DBGMCU_IDCODE_F0) & 0xfff;
+	DEBUG("stage 2 got id code %" PRIx32 "\n", t->idcode);
 	switch(t->idcode) {
 	case 0x444:  /* STM32F03 RM0091 Rev.7, STM32F030x[4|6] RM0360 Rev. 4*/
 		t->driver = "STM32F03";
