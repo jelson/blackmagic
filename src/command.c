@@ -247,14 +247,47 @@ bool cmd_morse(void)
 	return true;
 }
 
+
+
+/*
+ * Attempts to parse a string as either being "enable" or
+ * "disable". If the parse is successful, returns 0 and sets the out
+ * param to indicate what was parsed. If not successful, emits a
+ * warning to the gdb port, returns -1 and leaves out untouched.
+ */
+static int parse_enable_or_disable(const char *s, bool *out) {
+	if (!strncmp(s, "enable", strlen(s))) {
+		*out = true;
+		return 0;
+	} else if (!strncmp(s, "disable", strlen(s))) {
+		*out = false;
+		return 0;
+	} else {
+		gdb_outf("Argument '%s' not recognized as 'enable' or 'disable'\n", s);
+		return -1;
+	}
+}
+
 static bool cmd_connect_srst(target *t, int argc, const char **argv)
 {
 	(void)t;
-	if (argc == 1)
+	bool print_status = false;
+
+	if (argc == 1) {
+		print_status = true;
+	} else if (argc == 2) {
+		if (!parse_enable_or_disable(argv[1], &connect_assert_srst)) {
+			print_status = true;
+		}
+	} else {
+		gdb_outf("Unrecognized command format\n");
+	}
+
+	if (print_status) {
 		gdb_outf("Assert SRST during connect: %s\n",
 			 connect_assert_srst ? "enabled" : "disabled");
-	else
-		connect_assert_srst = !strcmp(argv[1], "enable");
+	}
+
 	return true;
 }
 
@@ -280,11 +313,20 @@ static bool cmd_hard_srst(void)
 static bool cmd_target_power(target *t, int argc, const char **argv)
 {
 	(void)t;
-	if (argc == 1)
+
+	if (argc == 1) {
 		gdb_outf("Target Power: %s\n",
 			 platform_target_get_power() ? "enabled" : "disabled");
-	else
-		platform_target_set_power(!strncmp(argv[1], "enable", strlen(argv[1])));
+	} else if (argc == 2) {
+		bool want_enable = false;
+		if (!parse_enable_or_disable(argv[1], &want_enable)) {
+			platform_target_set_power(want_enable);
+			gdb_outf("%s target power\n", want_enable ? "Enabling" : "Disabling");
+		}
+	} else {
+		gdb_outf("Unrecognized command format\n");
+	}
+
 	return true;
 }
 #endif
@@ -313,11 +355,22 @@ static bool cmd_traceswo(target *t, int argc, const char **argv)
 static bool cmd_debug_bmp(target *t, int argc, const char **argv)
 {
 	(void)t;
-	if (argc > 1) {
-		debug_bmp = !strcmp(argv[1], "enable");
+	bool print_status = false;
+
+	if (argc == 1) {
+		print_status = true;
+	} else if (argc == 2) {
+		if (!parse_enable_or_disable(argv[1], &debug_bmp)) {
+			print_status = true;
+		}
+	} else {
+		gdb_outf("Unrecognized command format\n");
 	}
-	gdb_outf("Debug mode is %s\n",
-		 debug_bmp ? "enabled" : "disabled");
+
+	if (print_status) {
+		gdb_outf("Debug mode is %s\n",
+			 debug_bmp ? "enabled" : "disabled");
+	}
 	return true;
 }
 #endif
