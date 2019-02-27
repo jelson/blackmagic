@@ -28,7 +28,7 @@
 
 #if NUM_DELAY_TICKS > 0
 #define DELAY() do {volatile int d = NUM_DELAY_TICKS; while (d--);} while(0)
-#else 
+#else
 #define DELAY() do {} while(0)
 #endif
 
