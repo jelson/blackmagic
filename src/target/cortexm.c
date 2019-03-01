@@ -241,7 +241,6 @@ static void cortexm_priv_free(void *priv)
 static bool cortexm_forced_halt(target *t)
 {
 	target_halt_request(t);
-	platform_srst_set_val(false);
 	uint32_t dhcsr = 0;
 	uint32_t start_time = platform_time_ms();
 	/* Try hard to halt the target. STM32F7 in  WFI
@@ -294,6 +293,36 @@ bool cortexm_probe(ADIv5_AP_t *ap, bool forced)
 
 	target_add_commands(t, cortexm_cmd_list, cortexm_driver_str);
 
+	/* Default vectors to catch */
+	priv->demcr = CORTEXM_DEMCR_TRCENA | CORTEXM_DEMCR_VC_HARDERR |
+			CORTEXM_DEMCR_VC_CORERESET;
+
+	/*
+	 * Some devices, such as the STM32F0, will not correctly
+	 * respond to probes under reset. Therefore, if we're
+	 * attempting to connect under reset, we should first write to
+	 * the debug register to catch the reset vector so that we
+	 * immediately halt when reset is released, then request a
+	 * halt and release reset. This will prevent any user code
+	 * from running on the target.
+	 */
+	bool conn_reset = false;
+	if (platform_srst_get_val()) {
+		conn_reset = true;
+
+		/* Request halt when reset is de-asseted */
+		target_mem_write32(t, CORTEXM_DEMCR, priv->demcr);
+
+		/* Force a halt */
+		cortexm_forced_halt(t);
+
+		/* Release reset */
+		platform_srst_set_val(false);
+
+		/* Poll for release from reset */
+		while (target_mem_read32(t, CORTEXM_DHCSR) & CORTEXM_DHCSR_S_RESET_ST);
+	}
+
 	/* Probe for FP extension */
 	uint32_t cpacr = target_mem_read32(t, CORTEXM_CPACR);
 	cpacr |= 0x00F00000; /* CP10 = 0b11, CP11 = 0b11 */
@@ -304,10 +333,6 @@ bool cortexm_probe(ADIv5_AP_t *ap, bool forced)
 		t->tdesc = tdesc_cortex_mf;
 	}
 
-	/* Default vectors to catch */
-	priv->demcr = CORTEXM_DEMCR_TRCENA | CORTEXM_DEMCR_VC_HARDERR |
-			CORTEXM_DEMCR_VC_CORERESET;
-
 	/* Check cache type */
 	uint32_t ctr = target_mem_read32(t, CORTEXM_CTR);
 	if ((ctr >> 29) == 4) {
@@ -315,6 +340,11 @@ bool cortexm_probe(ADIv5_AP_t *ap, bool forced)
 		priv->dcache_minline = 4 << (ctr & 0xf);
 	} else {
 		target_check_error(t);
+	}
+
+	/* If we set the interrupt catch vector earlier, clear it. */
+	if (conn_reset) {
+	  target_mem_write32(t, CORTEXM_DEMCR, 0);
 	}
 
 	/* Only force halt if read ROM Table failed and there is no DPv2
@@ -326,7 +356,15 @@ bool cortexm_probe(ADIv5_AP_t *ap, bool forced)
 			return false;
 
 #define PROBE(x) \
-	do { if ((x)(t)) {target_halt_resume(t, 0); return true;} else target_check_error(t); } while (0)
+	do {					\
+	  if ((x)(t)) {				\
+	    if (!conn_reset) {			\
+	      target_halt_resume(t, 0);		\
+	    }					\
+	    return true;			\
+	  } else				\
+	    target_check_error(t);		\
+	} while (0)
 
 	PROBE(stm32f1_probe);
 	PROBE(stm32f4_probe);
