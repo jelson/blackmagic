@@ -347,8 +347,10 @@ bool cortexm_probe(ADIv5_AP_t *ap, bool forced)
 		target_check_error(t);
 	}
 
-	/* Clear the interrupt catch vector */
-	target_mem_write32(t, CORTEXM_DEMCR, 0);
+	/* If we set the interrupt catch vector earlier, clear it. */
+	if (conn_reset) {
+	  target_mem_write32(t, CORTEXM_DEMCR, 0);
+	}
 
 	/* Only force halt if read ROM Table failed and there is no DPv2
 	 * targetid!
